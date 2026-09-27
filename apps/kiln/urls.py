@@ -9,6 +9,7 @@ urlpatterns = [
     path("hearth/<int:pk>/phase/", views.change_phase, name="change_phase"),
     path("hearth/<int:pk>/probe/", views.add_probe, name="add_probe"),
     path("hearth/<int:pk>/open-run/", views.open_run, name="open_run"),
+    path("hearth/<int:pk>/run/", views.edit_run, name="edit_run"),
     path("hearth/<int:pk>/close-run/", views.close_run, name="close_run"),
     path("resin-lots/", views.resin_lot_feed, name="resin_lot_feed"),
 ]

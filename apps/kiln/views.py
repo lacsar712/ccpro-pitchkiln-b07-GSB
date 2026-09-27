@@ -8,9 +8,15 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .forms import OpenCookRunForm, PhaseChangeForm, ResinLotForm, SoftPointProbeForm
+from .forms import (
+    CookRunForm,
+    OpenCookRunForm,
+    PhaseChangeForm,
+    ResinLotForm,
+    SoftPointProbeForm,
+)
 from .models import CookRun, FireHearth, ResinLot
-from .services.floor_rules import change_hearth_phase
+from .services.floor_rules import change_hearth_phase, is_run_frozen
 
 
 def _wants_htmx(request):
@@ -38,26 +44,46 @@ def _board_context():
         (key, label, sum(1 for h in hearths if h.phase == key))
         for key, label in FireHearth.PHASE_CHOICES
     ]
+    # 冻结标记与抽屉读同一个 is_run_frozen；只标注，不改 phase，
+    # 因此出胶瓦片数始终与图例计数对齐。
+    frozen_hearth_ids = {
+        h.pk
+        for h in hearths
+        if is_run_frozen(h.open_runs_cache[0] if h.open_runs_cache else None, h)
+    }
     return {
         "hearths": hearths,
         "lanes": sorted(lanes.items()),
         "phase_legend": phase_legend,
+        "frozen_hearth_ids": frozen_hearth_ids,
     }
 
 
-def _drawer_context(hearth):
+def _drawer_context(hearth, run_form=None):
     open_run = hearth.open_run()
     probes = []
     if open_run:
         probes = list(open_run.probes.order_by("-sampledAt", "-id"))
-    return {
+    # 已收灶历史：只读陈列，永不进入冻结判定。
+    history_runs = list(
+        hearth.runs.filter(closedAt__isnull=False)
+        .select_related("resinLot")
+        .order_by("-closedAt", "-id")[:5]
+    )
+    frozen = is_run_frozen(open_run, hearth)
+    ctx = {
         "hearth": hearth,
         "open_run": open_run,
+        "run_frozen": frozen,
         "probes": probes,
+        "history_runs": history_runs,
         "phase_form": PhaseChangeForm(hearth=hearth),
         "probe_form": SoftPointProbeForm() if open_run else None,
+        "run_form": run_form
+        or (CookRunForm(instance=open_run) if open_run else None),
         "open_run_form": OpenCookRunForm(hearth=hearth) if open_run is None else None,
     }
+    return ctx
 
 
 @login_required
@@ -164,6 +190,44 @@ def open_run(request, pk):
     if _wants_htmx(request):
         hearth.refresh_from_db()
         resp = render(request, "floor/_drawer.html", _drawer_context(hearth))
+        resp["HX-Trigger"] = "floor-refresh"
+        return resp
+    return redirect(f"/?hearth={pk}")
+
+
+@login_required
+@require_POST
+def edit_run(request, pk):
+    """抽屉「保存值守」：冻结态由 CookRunForm → is_run_frozen 同源拒绝。"""
+    hearth = get_object_or_404(FireHearth, pk=pk)
+    open_run = hearth.open_run()
+    if open_run is None:
+        messages.error(request, "没有进行中的值守可保存")
+        if _wants_htmx(request):
+            resp = render(request, "floor/_drawer.html", _drawer_context(hearth))
+            resp["HX-Trigger"] = "floor-refresh"
+            return resp
+        return redirect(f"/?hearth={pk}")
+
+    form = CookRunForm(request.POST, instance=open_run)
+    if form.is_valid():
+        try:
+            form.save()
+            messages.success(request, "值守信息已保存")
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0])
+    else:
+        for errs in form.errors.values():
+            messages.error(request, errs[0])
+            break
+
+    if _wants_htmx(request):
+        hearth.refresh_from_db()
+        resp = render(
+            request,
+            "floor/_drawer.html",
+            _drawer_context(hearth, run_form=form),
+        )
         resp["HX-Trigger"] = "floor-refresh"
         return resp
     return redirect(f"/?hearth={pk}")

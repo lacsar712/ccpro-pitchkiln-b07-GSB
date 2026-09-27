@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from .forms import AdminCookRunForm
 from .models import CookRun, FireHearth, ResinLot, SoftPointProbe
 
 
@@ -18,6 +19,7 @@ class FireHearthAdmin(admin.ModelAdmin):
 
 @admin.register(CookRun)
 class CookRunAdmin(admin.ModelAdmin):
+    form = AdminCookRunForm
     list_display = (
         "id",
         "hearth",

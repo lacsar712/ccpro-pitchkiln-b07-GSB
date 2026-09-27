@@ -1,4 +1,7 @@
+from django.core.exceptions import ValidationError
 from django.db import models
+
+from .services.floor_rules import assert_frozen_save_allowed, is_run_frozen
 
 
 class ResinLot(models.Model):
@@ -87,6 +90,16 @@ class CookRun(models.Model):
     @property
     def is_open(self):
         return self.closedAt is None
+
+    @property
+    def is_frozen(self):
+        """未收灶且灶台处于出胶相位时，目标软化点/开灶时间冻结。"""
+        return is_run_frozen(self)
+
+    def save(self, *args, **kwargs):
+        # 冻结兜底：任何入口改写冻结字段都在此被拦下（收灶只改 closedAt，放行）。
+        assert_frozen_save_allowed(self, kwargs.get("update_fields"))
+        super().save(*args, **kwargs)
 
 
 class SoftPointProbe(models.Model):

@@ -11,14 +11,32 @@
 
   {% if open_run %}
   <section class="drawer-block">
-    <h3>进行中值守</h3>
-    <dl class="kv">
+    <h3>
+      进行中值守
+      {% if run_frozen %}<span class="freeze-tag" title="出胶期间冻结，须收灶回冷灶后方可修改">冻结中</span>{% endif %}
+    </h3>
+    {% if run_frozen %}
+    {# 冻结：纯只读展示，不渲染可提交的开灶/目标输入框；后端同样拒绝（同源 is_run_frozen）。#}
+    <dl class="kv frozen-kv">
       <dt>来脂批</dt><dd>{{ open_run.resinLot.lotCode }}</dd>
       <dt>来源</dt><dd>{{ open_run.resinLot.originPlace }}</dd>
       <dt>开灶</dt><dd class="mono">{{ open_run.openedAt|date:"Y-m-d H:i" }}</dd>
       <dt>目标软化点</dt><dd class="mono">{{ open_run.targetSoftPointC }} ℃</dd>
     </dl>
+    <p class="freeze-note">灶已进入出胶：开灶时间与目标软化点已冻结，须收灶回冷灶后方可修改；探针仍可继续登记。</p>
+    {% else %}
+    <form method="post" action="{% url 'edit_run' hearth.pk %}"
+          class="stack-form"
+          hx-post="{% url 'edit_run' hearth.pk %}"
+          hx-target="#hearth-drawer"
+          hx-swap="innerHTML">
+      {% csrf_token %}
+      {{ run_form.as_p }}
+      <button type="submit" class="btn-ember">保存值守</button>
+    </form>
+    {% endif %}
     <form method="post" action="{% url 'close_run' hearth.pk %}"
+          class="close-run-form"
           hx-post="{% url 'close_run' hearth.pk %}"
           hx-target="#hearth-drawer"
           hx-swap="innerHTML">
@@ -44,6 +62,7 @@
 
   <section class="drawer-block">
     <h3>登记探针</h3>
+    <p class="hint">探针不在冻结范围，出胶期间仍可追加。</p>
     <form method="post" action="{% url 'add_probe' hearth.pk %}"
           class="stack-form"
           hx-post="{% url 'add_probe' hearth.pk %}"
@@ -70,9 +89,25 @@
   </section>
   {% endif %}
 
+  {% if history_runs %}
+  <section class="drawer-block">
+    <h3>已收灶历史</h3>
+    <p class="hint">历史值守不受冻结约束，仅供查阅。</p>
+    <ul class="run-history">
+      {% for r in history_runs %}
+      <li>
+        <span class="mono">{{ r.openedAt|date:"m-d H:i" }} → {{ r.closedAt|date:"m-d H:i" }}</span>
+        <span class="hist-lot">{{ r.resinLot.lotCode }}</span>
+        <span class="mono hist-target">目标 {{ r.targetSoftPointC }}℃</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
   <section class="drawer-block">
     <h3>切换相位</h3>
-    <p class="hint">进入「出胶」须当前值守至少一条探针 ≤95℃。</p>
+    <p class="hint">进入「出胶」须当前值守至少一条探针 ≤95℃；进入出胶即冻结开灶时间与目标软化点，回冷灶（收灶）后解除。</p>
     <form method="post" action="{% url 'change_phase' hearth.pk %}"
           class="stack-form"
           hx-post="{% url 'change_phase' hearth.pk %}"

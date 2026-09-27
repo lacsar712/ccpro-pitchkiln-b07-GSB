@@ -349,6 +349,7 @@ body {
   min-height: 118px;
   transition: border-color 0.15s, transform 0.1s;
   border-left-width: 4px;
+  position: relative;
 }
 
 .hearth-tile:hover {
@@ -382,6 +383,24 @@ body {
 .tile-grade { font-size: 0.78rem; color: var(--steel); }
 .tile-temp { font-size: 0.85rem; margin-top: 0.25rem; }
 .tile-lot { font-size: 0.68rem; color: var(--steel); word-break: break-all; }
+
+/* 冻结态：只加冰蓝描边/角标，不改 phase-* 底色，确保与图例对齐。 */
+.hearth-tile.is-frozen {
+  outline: 1px solid #7dd3fc;
+  outline-offset: -1px;
+}
+
+.tile-frozen {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: #0c1a22;
+  background: #7dd3fc;
+  padding: 0.05rem 0.3rem;
+  font-weight: 800;
+}
 
 .board-empty { color: var(--steel); }
 
@@ -478,6 +497,64 @@ body {
 
 .kv dt { color: var(--steel); margin: 0; }
 .kv dd { margin: 0; }
+
+/* 冻结只读：冰蓝左边线 + 说明条。 */
+.freeze-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  color: #7dd3fc;
+  border: 1px solid #7dd3fc;
+  padding: 0.05rem 0.35rem;
+  vertical-align: middle;
+}
+
+.frozen-kv {
+  padding: 0.55rem 0.65rem;
+  border-left: 3px solid #7dd3fc;
+  background: rgba(125, 211, 252, 0.07);
+}
+
+.freeze-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  color: #7dd3fc;
+}
+
+.close-run-form { margin-top: 0.65rem; }
+
+.run-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.run-history li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.1rem 0.6rem;
+  font-size: 0.75rem;
+  border-left: 2px solid #3f342a;
+  padding-left: 0.6rem;
+}
+
+.run-history .hist-lot {
+  grid-column: 1;
+  color: var(--steel);
+  font-size: 0.7rem;
+}
+
+.run-history .hist-target {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--cinder);
+}
 
 .probe-timeline {
   list-style: none;

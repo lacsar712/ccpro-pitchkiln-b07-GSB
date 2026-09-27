@@ -125,6 +125,22 @@ def ensure_seed_data():
         samplerName="值守阿萍",
     )
 
+    # 同一出胶灶上的一条「已收灶」历史值守：历史行不受冻结约束，
+    # 冻结只作用于上方未收灶的 run3。
+    run3_prev = CookRun.objects.create(
+        hearth=h3,
+        resinLot=lot_a,
+        openedAt=now - timezone.timedelta(days=1, hours=2),
+        closedAt=now - timezone.timedelta(hours=15),
+        targetSoftPointC=Decimal("84.50"),
+    )
+    SoftPointProbe.objects.create(
+        run=run3_prev,
+        sampledAt=now - timezone.timedelta(days=1),
+        softPointC=Decimal("94.80"),
+        samplerName="值守阿萍",
+    )
+
     CookRun.objects.create(
         hearth=h5,
         resinLot=lot_a,
