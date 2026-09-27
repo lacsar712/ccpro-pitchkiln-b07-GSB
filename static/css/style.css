@@ -251,6 +251,12 @@ body {
   border-color: var(--ember);
 }
 
+.field:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
 /* —— board —— */
 .board-head,
 .feed-head {
@@ -379,6 +385,16 @@ body {
   opacity: 0.9;
 }
 
+.tile-frozen {
+  font-style: normal;
+  font-size: 0.66rem;
+  color: var(--cinder);
+  border: 1px dashed var(--ember-dim);
+  padding: 0.02rem 0.3rem;
+  margin-left: 0.15rem;
+  white-space: nowrap;
+}
+
 .tile-grade { font-size: 0.78rem; color: var(--steel); }
 .tile-temp { font-size: 0.85rem; margin-top: 0.25rem; }
 .tile-lot { font-size: 0.68rem; color: var(--steel); word-break: break-all; }
@@ -449,6 +465,11 @@ body {
 .badge.phase-ramping { color: #fb923c; }
 .badge.phase-holding { color: #f59e0b; }
 .badge.phase-drawing { color: #f87171; }
+
+.badge.badge-frozen {
+  color: var(--cinder);
+  border-style: dashed;
+}
 
 .drawer-block {
   border-top: 1px solid #2a241e;

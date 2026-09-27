@@ -105,6 +105,15 @@ def ensure_seed_data():
         samplerName="值守阿坤",
     )
 
+    # 出胶灶（坑火-西一）：一条已收灶历史 + 一条未收灶值守
+    CookRun.objects.create(
+        hearth=h3,
+        resinLot=lot_a,
+        openedAt=now - timezone.timedelta(days=3, hours=2),
+        closedAt=now - timezone.timedelta(days=2, hours=5),
+        targetSoftPointC=Decimal("84.50"),
+    )
+
     run3 = CookRun.objects.create(
         hearth=h3,
         resinLot=lot_b,

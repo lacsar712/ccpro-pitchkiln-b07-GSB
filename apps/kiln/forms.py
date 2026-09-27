@@ -1,4 +1,5 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .models import CookRun, FireHearth, ResinLot, SoftPointProbe
@@ -31,6 +32,34 @@ class ResinLotForm(forms.ModelForm):
             self.initial["receivedAt"] = local.strftime("%Y-%m-%dT%H:%M")
 
 
+class CookRunAdjustForm(forms.ModelForm):
+    """抽屉值守保存：仅允许调整目标软化点与开灶时刻。"""
+
+    class Meta:
+        model = CookRun
+        fields = ["targetSoftPointC", "openedAt"]
+        widgets = {
+            "targetSoftPointC": forms.NumberInput(
+                attrs={"class": "field", "step": "0.01"}
+            ),
+            "openedAt": forms.DateTimeInput(
+                attrs={"class": "field", "type": "datetime-local"},
+                format="%Y-%m-%dT%H:%M",
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["openedAt"].input_formats = [
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+        ]
+        if self.instance and self.instance.pk and self.instance.openedAt:
+            local = timezone.localtime(self.instance.openedAt)
+            self.initial["openedAt"] = local.strftime("%Y-%m-%dT%H:%M")
+
+
 class PhaseChangeForm(forms.Form):
     phase = forms.ChoiceField(
         label="相位",
@@ -47,7 +76,11 @@ class PhaseChangeForm(forms.Form):
     def clean_phase(self):
         phase = self.cleaned_data["phase"]
         if self.hearth is not None and phase == FireHearth.PHASE_DRAWING:
-            assert_can_enter_drawing(self.hearth)
+            try:
+                assert_can_enter_drawing(self.hearth)
+            except ValidationError as exc:
+                # 字段级校验须抛非字典形式，否则 Django 拒绝 add_error
+                raise ValidationError(exc.messages)
         return phase
 
 

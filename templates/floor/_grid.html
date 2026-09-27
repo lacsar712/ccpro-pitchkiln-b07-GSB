@@ -3,6 +3,11 @@
      hx-get="{% url 'floor_grid' %}"
      hx-trigger="floor-refresh from:body"
      hx-swap="outerHTML">
+  <div class="phase-legend">
+    {% for key, label, count in phase_legend %}
+    <span class="leg phase-{{ key }}"><i></i>{{ label }} {{ count }}</span>
+    {% endfor %}
+  </div>
   {% for lane, tiles in lanes %}
   <div class="lane-row">
     <div class="lane-label">过道 {{ lane }}</div>
@@ -16,7 +21,7 @@
               hx-swap="innerHTML"
               onclick="document.getElementById('hearth-drawer').classList.add('open')">
         <span class="tile-tag">{{ h.tag }}</span>
-        <span class="tile-phase">{{ h.get_phase_display }}</span>
+        <span class="tile-phase">{{ h.get_phase_display }}{% if h.run_frozen %} <em class="tile-frozen">冻结</em>{% endif %}</span>
         <span class="tile-grade">{{ h.resinGrade }}</span>
         {% if open %}
         <span class="tile-temp mono">目标 {{ open.targetSoftPointC }}℃</span>

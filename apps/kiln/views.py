@@ -8,9 +8,19 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .forms import OpenCookRunForm, PhaseChangeForm, ResinLotForm, SoftPointProbeForm
+from .forms import (
+    CookRunAdjustForm,
+    OpenCookRunForm,
+    PhaseChangeForm,
+    ResinLotForm,
+    SoftPointProbeForm,
+)
 from .models import CookRun, FireHearth, ResinLot
-from .services.floor_rules import change_hearth_phase
+from .services.floor_rules import (
+    assert_run_fields_mutable,
+    change_hearth_phase,
+    run_fields_frozen,
+)
 
 
 def _wants_htmx(request):
@@ -31,6 +41,9 @@ def _hearths_for_board():
 
 def _board_context():
     hearths = list(_hearths_for_board())
+    for h in hearths:
+        open_run = h.open_runs_cache[0] if h.open_runs_cache else None
+        h.run_frozen = run_fields_frozen(h, open_run)
     lanes = {}
     for h in hearths:
         lanes.setdefault(h.lane, []).append(h)
@@ -48,16 +61,35 @@ def _board_context():
 def _drawer_context(hearth):
     open_run = hearth.open_run()
     probes = []
+    run_form = None
+    run_frozen = run_fields_frozen(hearth, open_run)
     if open_run:
         probes = list(open_run.probes.order_by("-sampledAt", "-id"))
+        run_form = CookRunAdjustForm(instance=open_run)
+        if run_frozen:
+            # 只读展示与保存拒绝同源：同一判定函数冻结则字段只读
+            for field in run_form.fields.values():
+                field.disabled = True
     return {
         "hearth": hearth,
         "open_run": open_run,
+        "run_frozen": run_frozen,
+        "run_form": run_form,
         "probes": probes,
         "phase_form": PhaseChangeForm(hearth=hearth),
         "probe_form": SoftPointProbeForm() if open_run else None,
         "open_run_form": OpenCookRunForm(hearth=hearth) if open_run is None else None,
     }
+
+
+def _drawer_response(request, hearth):
+    """htmx 提交后统一重绘抽屉：消息随抽屉展示，并触发看板刷新。"""
+    hearth.refresh_from_db()
+    ctx = _drawer_context(hearth)
+    ctx["drawer_messages"] = True
+    resp = render(request, "floor/_drawer.html", ctx)
+    resp["HX-Trigger"] = "floor-refresh"
+    return resp
 
 
 @login_required
@@ -110,10 +142,7 @@ def change_phase(request, pk):
         messages.error(request, err[0] if err else "相位切换失败")
 
     if _wants_htmx(request):
-        hearth.refresh_from_db()
-        resp = render(request, "floor/_drawer.html", _drawer_context(hearth))
-        resp["HX-Trigger"] = "floor-refresh"
-        return resp
+        return _drawer_response(request, hearth)
     return redirect(f"/?hearth={pk}")
 
 
@@ -136,9 +165,36 @@ def add_probe(request, pk):
         messages.error(request, "探针登记失败，请检查输入")
 
     if _wants_htmx(request):
-        resp = render(request, "floor/_drawer.html", _drawer_context(hearth))
-        resp["HX-Trigger"] = "floor-refresh"
-        return resp
+        return _drawer_response(request, hearth)
+    return redirect(f"/?hearth={pk}")
+
+
+@login_required
+@require_POST
+def update_run(request, pk):
+    """抽屉值守保存：改目标软化点 / 开灶时刻；出胶冻结时中文挡下。"""
+    hearth = get_object_or_404(FireHearth, pk=pk)
+    open_run = hearth.open_run()
+    if open_run is None:
+        messages.error(request, "没有进行中的值守，无法保存值守参数")
+    else:
+        try:
+            assert_run_fields_mutable(hearth, open_run)
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0])
+        else:
+            form = CookRunAdjustForm(request.POST, instance=open_run)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "值守参数已保存")
+            else:
+                for errs in form.errors.values():
+                    for e in errs:
+                        messages.error(request, e)
+                    break
+
+    if _wants_htmx(request):
+        return _drawer_response(request, hearth)
     return redirect(f"/?hearth={pk}")
 
 
@@ -162,10 +218,7 @@ def open_run(request, pk):
             break
 
     if _wants_htmx(request):
-        hearth.refresh_from_db()
-        resp = render(request, "floor/_drawer.html", _drawer_context(hearth))
-        resp["HX-Trigger"] = "floor-refresh"
-        return resp
+        return _drawer_response(request, hearth)
     return redirect(f"/?hearth={pk}")
 
 
@@ -184,10 +237,7 @@ def close_run(request, pk):
         messages.success(request, "值守已收灶，灶台回冷灶")
 
     if _wants_htmx(request):
-        hearth.refresh_from_db()
-        resp = render(request, "floor/_drawer.html", _drawer_context(hearth))
-        resp["HX-Trigger"] = "floor-refresh"
-        return resp
+        return _drawer_response(request, hearth)
     return redirect(f"/?hearth={pk}")
 
 
